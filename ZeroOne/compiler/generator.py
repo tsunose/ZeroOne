@@ -3,7 +3,7 @@ ZeroOne Compiler
 
 generator.py
 
-Version 2.0.0
+Version 3.0.0 - Extended Code Generator
 """
 
 from compiler.ast import *
@@ -21,6 +21,10 @@ class Generator:
 
         self.function_table = {}
 
+        self.class_table = {}
+
+        self.loop_stack = []  # For break/continue
+
     # ==========================
     # Utility
     # ==========================
@@ -32,6 +36,10 @@ class Generator:
         self.label_counter = 0
 
         self.function_table.clear()
+
+        self.class_table.clear()
+
+        self.loop_stack.clear()
 
     def emit(
         self,
@@ -129,6 +137,10 @@ class Generator:
         node
     ):
 
+        if node is None:
+            self.emit(OpCode.PUSH, None)
+            return
+
         if isinstance(
             node,
             NumberNode
@@ -167,6 +179,18 @@ class Generator:
 
         if isinstance(
             node,
+            NullNode
+        ):
+
+            self.emit(
+                OpCode.PUSH,
+                None
+            )
+
+            return
+
+        if isinstance(
+            node,
             IdentifierNode
         ):
 
@@ -186,17 +210,21 @@ class Generator:
                 node.value
             )
 
-            if node.operator.upper() == "NOT":
+            operator_map = {
+                "NOT": OpCode.NOT,
+                "-": OpCode.NEG,
+                "+": OpCode.PUSH,  # Unary plus
+                "~": OpCode.BITNOT,
+            }
 
-                self.emit(
-                    OpCode.NOT
-                )
+            opcode = operator_map.get(node.operator)
 
-            else:
-
+            if opcode is None:
                 raise GeneratorError(
                     f"Unknown unary operator: {node.operator}"
                 )
+
+            self.emit(opcode)
 
             return
 
@@ -219,9 +247,109 @@ class Generator:
 
             return
 
+        if isinstance(
+            node,
+            TernaryOperationNode
+        ):
+
+            self.generate_ternary(node)
+            return
+
+        if isinstance(
+            node,
+            IndexNode
+        ):
+
+            self.generate_expression(node.target)
+            self.generate_expression(node.index)
+            self.emit(OpCode.ARRAY_GET)
+            return
+
+        if isinstance(
+            node,
+            PropertyNode
+        ):
+
+            self.generate_expression(node.target)
+            self.emit(OpCode.GET_PROP, node.property_name)
+            return
+
+        if isinstance(
+            node,
+            ArrayNode
+        ):
+
+            self.emit(OpCode.ARRAY_NEW)
+
+            for element in node.elements:
+                self.generate_expression(element)
+                self.emit(OpCode.ARRAY_PUSH)
+
+            return
+
+        if isinstance(
+            node,
+            MapNode
+        ):
+
+            self.emit(OpCode.MAP_NEW)
+
+            for key, value in node.pairs:
+                self.generate_expression(key)
+                self.generate_expression(value)
+                self.emit(OpCode.MAP_SET)
+
+            return
+
+        if isinstance(
+            node,
+            FunctionCallNode
+        ):
+
+            for arg in node.arguments:
+                self.generate_expression(arg)
+
+            self.emit(OpCode.CALL, node.name)
+            return
+
+        if isinstance(
+            node,
+            LambdaNode
+        ):
+
+            self.emit(OpCode.LAMBDA)
+            # Body will be compiled separately
+            for stmt in node.body:
+                self.generate_statement(stmt)
+
+            return
+
         raise GeneratorError(
             f"Unknown expression node: {type(node).__name__}"
         )
+
+    # ==========================
+    # Ternary Operation
+    # ==========================
+
+    def generate_ternary(self, node):
+
+        else_label = self.new_label()
+        end_label = self.new_label()
+
+        self.generate_expression(node.condition)
+
+        self.emit(OpCode.JMP_IF_FALSE, else_label)
+
+        self.generate_expression(node.true_value)
+
+        self.emit(OpCode.JMP, end_label)
+
+        self.place_label(else_label)
+
+        self.generate_expression(node.false_value)
+
+        self.place_label(end_label)
 
     # ==========================
     # Binary Operation
@@ -233,26 +361,38 @@ class Generator:
     ):
 
         table = {
-
+            # Arithmetic
             "+": OpCode.ADD,
             "-": OpCode.SUB,
             "*": OpCode.MUL,
             "/": OpCode.DIV,
             "%": OpCode.MOD,
+            "**": OpCode.POWER,
 
+            # Comparison
             "==": OpCode.EQ,
             "!=": OpCode.NE,
             "<": OpCode.LT,
             "<=": OpCode.LE,
             ">": OpCode.GT,
             ">=": OpCode.GE,
+            "===": OpCode.EQ,  # Strict equality
+            "!==": OpCode.NE,  # Strict inequality
 
+            # Logical
             "AND": OpCode.AND,
-            "OR": OpCode.OR
+            "OR": OpCode.OR,
 
+            # Bitwise
+            "&": OpCode.BITAND,
+            "|": OpCode.BITOR,
+            "^": OpCode.BITXOR,
+            "<<": OpCode.LSHIFT,
+            ">>": OpCode.RSHIFT,
+            ">>>": OpCode.ARSHIFT,
         }
 
-        key = operator.upper()
+        key = operator.upper() if operator.isalpha() else operator
 
         if key not in table:
 
@@ -273,7 +413,7 @@ class Generator:
         node
     ):
 
-        if isinstance(node, NoOpNode):
+        if node is None or isinstance(node, NoOpNode):
             return
 
         if isinstance(
@@ -297,9 +437,12 @@ class Generator:
             OutNode
         ):
 
-            self.generate_expression(
-                node.value
-            )
+            if node.value is not None:
+                self.generate_expression(
+                    node.value
+                )
+            else:
+                self.emit(OpCode.PUSH, "")
 
             self.emit(
                 OpCode.PRINT
@@ -312,9 +455,12 @@ class Generator:
             ReturnNode
         ):
 
-            self.generate_expression(
-                node.value
-            )
+            if node.value is not None:
+                self.generate_expression(
+                    node.value
+                )
+            else:
+                self.emit(OpCode.PUSH, None)
 
             self.emit(
                 OpCode.RETURN
@@ -328,7 +474,8 @@ class Generator:
         ):
 
             self.emit(
-                OpCode.EXIT
+                OpCode.EXIT,
+                node.code
             )
 
             return
@@ -338,7 +485,7 @@ class Generator:
             ImportNode
         ):
 
-            # Version 2.0.0では予約
+            # Reserved for future implementation
             return
 
         if isinstance(
@@ -346,7 +493,7 @@ class Generator:
             AssetNode
         ):
 
-            # Version 2.0.0では予約
+            # Reserved for future implementation
             return
 
         if isinstance(
@@ -362,6 +509,14 @@ class Generator:
 
         if isinstance(
             node,
+            SwitchNode
+        ):
+
+            self.generate_switch(node)
+            return
+
+        if isinstance(
+            node,
             LoopNode
         ):
 
@@ -373,6 +528,65 @@ class Generator:
 
         if isinstance(
             node,
+            WhileNode
+        ):
+
+            self.generate_while(node)
+            return
+
+        if isinstance(
+            node,
+            ForNode
+        ):
+
+            self.generate_for(node)
+            return
+
+        if isinstance(
+            node,
+            ForEachNode
+        ):
+
+            self.generate_foreach(node)
+            return
+
+        if isinstance(
+            node,
+            BreakNode
+        ):
+
+            if self.loop_stack:
+                self.emit(OpCode.JMP, self.loop_stack[-1]["end"])
+            return
+
+        if isinstance(
+            node,
+            ContinueNode
+        ):
+
+            if self.loop_stack:
+                self.emit(OpCode.JMP, self.loop_stack[-1]["start"])
+            return
+
+        if isinstance(
+            node,
+            TryNode
+        ):
+
+            self.generate_try(node)
+            return
+
+        if isinstance(
+            node,
+            ThrowNode
+        ):
+
+            self.generate_expression(node.expression)
+            self.emit(OpCode.THROW)
+            return
+
+        if isinstance(
+            node,
             FunctionNode
         ):
 
@@ -380,6 +594,35 @@ class Generator:
                 node
             )
 
+            return
+
+        if isinstance(
+            node,
+            ClassNode
+        ):
+
+            self.generate_class(node)
+            return
+
+        if isinstance(
+            node,
+            IndexSetNode
+        ):
+
+            self.generate_expression(node.target)
+            self.generate_expression(node.index)
+            self.generate_expression(node.value)
+            self.emit(OpCode.ARRAY_SET)
+            return
+
+        if isinstance(
+            node,
+            PropertySetNode
+        ):
+
+            self.generate_expression(node.target)
+            self.generate_expression(node.value)
+            self.emit(OpCode.SET_PROP, node.property_name)
             return
 
         raise GeneratorError(
@@ -433,6 +676,45 @@ class Generator:
         )
 
     # ==========================
+    # SWITCH
+    # ==========================
+
+    def generate_switch(self, node):
+
+        end_label = self.new_label()
+
+        self.generate_expression(node.expression)
+
+        case_labels = []
+
+        for case in node.cases:
+            case_label = self.new_label()
+            case_labels.append(case_label)
+
+            self.emit(OpCode.DUP)
+            self.generate_expression(case.value)
+            self.emit(OpCode.EQ)
+            self.emit(OpCode.JMP_IF_TRUE, case_label)
+
+        default_label = self.new_label() if node.default_body else end_label
+
+        self.emit(OpCode.JMP, default_label)
+
+        for i, case in enumerate(node.cases):
+            self.place_label(case_labels[i])
+            for stmt in case.body:
+                self.generate_statement(stmt)
+            self.emit(OpCode.JMP, end_label)
+
+        if node.default_body:
+            self.place_label(default_label)
+            for stmt in node.default_body:
+                self.generate_statement(stmt)
+
+        self.place_label(end_label)
+        self.emit(OpCode.POP)  # Remove comparison value from stack
+
+    # ==========================
     # LOOP
     # ==========================
 
@@ -443,6 +725,11 @@ class Generator:
 
         start_label = self.new_label()
         end_label = self.new_label()
+
+        self.loop_stack.append({
+            "start": start_label,
+            "end": end_label
+        })
 
         self.place_label(
             start_label
@@ -471,6 +758,142 @@ class Generator:
         self.place_label(
             end_label
         )
+
+        self.loop_stack.pop()
+
+    # ==========================
+    # WHILE
+    # ==========================
+
+    def generate_while(self, node):
+
+        start_label = self.new_label()
+        end_label = self.new_label()
+
+        self.loop_stack.append({
+            "start": start_label,
+            "end": end_label
+        })
+
+        self.place_label(start_label)
+
+        self.generate_expression(node.condition)
+
+        self.emit(OpCode.JMP_IF_FALSE, end_label)
+
+        for stmt in node.body:
+            self.generate_statement(stmt)
+
+        self.emit(OpCode.JMP, start_label)
+
+        self.place_label(end_label)
+
+        self.loop_stack.pop()
+
+    # ==========================
+    # FOR
+    # ==========================
+
+    def generate_for(self, node):
+
+        if node.init:
+            self.generate_statement(node.init)
+
+        start_label = self.new_label()
+        end_label = self.new_label()
+
+        self.loop_stack.append({
+            "start": start_label,
+            "end": end_label
+        })
+
+        self.place_label(start_label)
+
+        if node.condition:
+            self.generate_expression(node.condition)
+        else:
+            self.emit(OpCode.PUSH, True)
+
+        self.emit(OpCode.JMP_IF_FALSE, end_label)
+
+        for stmt in node.body:
+            self.generate_statement(stmt)
+
+        if node.update:
+            self.generate_statement(node.update)
+
+        self.emit(OpCode.JMP, start_label)
+
+        self.place_label(end_label)
+
+        self.loop_stack.pop()
+
+    # ==========================
+    # FOREACH
+    # ==========================
+
+    def generate_foreach(self, node):
+
+        start_label = self.new_label()
+        end_label = self.new_label()
+
+        self.loop_stack.append({
+            "start": start_label,
+            "end": end_label
+        })
+
+        # Evaluate iterable and iterate
+        self.generate_expression(node.iterable)
+        self.emit(OpCode.ITERATOR)
+
+        self.place_label(start_label)
+
+        self.emit(OpCode.NEXT)
+        self.emit(OpCode.JMP_IF_NULL, end_label)
+
+        self.emit(OpCode.STORE, node.variable)
+
+        for stmt in node.body:
+            self.generate_statement(stmt)
+
+        self.emit(OpCode.JMP, start_label)
+
+        self.place_label(end_label)
+
+        self.loop_stack.pop()
+
+    # ==========================
+    # TRY-CATCH-FINALLY
+    # ==========================
+
+    def generate_try(self, node):
+
+        try_label = self.new_label()
+        catch_label = self.new_label() if node.catch_clause else None
+        finally_label = self.new_label() if node.finally_body else None
+        end_label = self.new_label()
+
+        self.place_label(try_label)
+
+        self.emit(OpCode.TRY, catch_label if catch_label else end_label)
+
+        for stmt in node.body:
+            self.generate_statement(stmt)
+
+        if catch_label:
+            self.place_label(catch_label)
+            self.emit(OpCode.CATCH, node.catch_clause.exception_type)
+
+            for stmt in node.catch_clause.body:
+                self.generate_statement(stmt)
+
+        if finally_label:
+            self.place_label(finally_label)
+
+            for stmt in node.finally_body:
+                self.generate_statement(stmt)
+
+        self.place_label(end_label)
 
     # ==========================
     # FUNCTION
@@ -506,3 +929,32 @@ class Generator:
         self.emit(
             OpCode.RETURN
         )
+
+    # ==========================
+    # CLASS
+    # ==========================
+
+    def generate_class(self, node):
+
+        class_label = "CLASS_" + node.name
+
+        if node.name in self.class_table:
+            raise GeneratorError(
+                f"Class '{node.name}' already exists."
+            )
+
+        self.class_table[node.name] = {
+            "extends": node.extends,
+            "methods": {}
+        }
+
+        self.place_label(class_label)
+
+        for item in node.body:
+            if isinstance(item, FunctionNode):
+                self.generate_function(item)
+            elif isinstance(item, SetNode):
+                # Class property (static)
+                self.generate_statement(item)
+
+        self.emit(OpCode.RETURN)
