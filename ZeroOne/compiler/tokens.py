@@ -3,7 +3,7 @@ ZeroOne Compiler
 
 tokens.py
 
-Version 2.0.0
+Version 3.0.0 - Extended Keywords
 """
 
 from enum import Enum, auto
@@ -64,23 +64,52 @@ class Token:
 CANONICAL_KEYWORDS = {
     # Variable
     "SET",
+    "LET",
+    "CONST",
+    "VAR",
 
     # Output
     "OUT",
+
+    # Input
+    "IN",
 
     # Condition
     "WHEN",
     "ELSE",
     "END",
+    "CASE",
+    "DEFAULT",
+    "SWITCH",
 
     # Loop
     "LOOP",
     "BREAK",
     "CONTINUE",
+    "WHILE",
+    "FOR",
+    "FOREACH",
 
     # Function
     "FUNC",
     "RETURN",
+    "LAMBDA",
+    "ASYNC",
+    "AWAIT",
+
+    # Class/Object
+    "CLASS",
+    "EXTENDS",
+    "NEW",
+    "THIS",
+    "SUPER",
+    "STATIC",
+
+    # Exception
+    "TRY",
+    "CATCH",
+    "FINALLY",
+    "THROW",
 
     # Program
     "EXIT",
@@ -95,10 +124,29 @@ CANONICAL_KEYWORDS = {
     "AND",
     "OR",
     "NOT",
+
+    # Type
+    "TYPE",
+    "CAST",
+    "NULL",
+    "VOID",
+
+    # Math
+    "MATH",
+
+    # String
+    "STRING",
+
+    # Array
+    "ARRAY",
+
+    # Map/Object
+    "MAP",
+    "OBJECT",
 }
 
 KEYWORD_ALIASES = {
-    # Output/Display
+    # ===== Output/Display =====
     "PRINT": "OUT",
     "SHOW": "OUT",
     "VIEW": "OUT",
@@ -108,7 +156,6 @@ KEYWORD_ALIASES = {
     "PUT": "OUT",
     "DRAW": "OUT",
     "RENDER": "OUT",
-    "POP": "OUT",
     "ALERT": "OUT",
     "NOTICE": "OUT",
     "MSG": "OUT",
@@ -119,34 +166,29 @@ KEYWORD_ALIASES = {
     "EXPORT": "OUT",
     "SEND": "OUT",
 
-    # Input
-    "IN": "OUT",
-    "INPUT": "OUT",
-    "READ": "OUT",
-    "GET": "OUT",
-    "FETCH": "OUT",
-    "SCAN": "OUT",
-    "ASK": "OUT",
-    "QUERY": "OUT",
-    "RECEIVE": "OUT",
-    "LOAD": "OUT",
-    "OPEN": "OUT",
-    "SELECT": "OUT",
-    "CHOOSE": "OUT",
-    "PICK": "OUT",
-    "FIND": "OUT",
-    "SEARCH": "OUT",
-    "LOOK": "OUT",
-    "CHECK": "OUT",
-    "CAPTURE": "OUT",
+    # ===== Input =====
+    "INPUT": "IN",
+    "READ": "IN",
+    "GET": "IN",
+    "FETCH": "IN",
+    "SCAN": "IN",
+    "ASK": "IN",
+    "QUERY": "IN",
+    "RECEIVE": "IN",
+    "LOAD": "IN",
+    "OPEN": "IN",
+    "SELECT": "IN",
+    "CHOOSE": "IN",
+    "PICK": "IN",
+    "FIND": "IN",
+    "SEARCH": "IN",
+    "LOOK": "IN",
+    "CHECK": "IN",
+    "CAPTURE": "IN",
 
-    # Variables
-    "LET": "SET",
-    "VAR": "SET",
-    "CONST": "SET",
+    # ===== Variables =====
     "DEFINE": "SET",
     "CREATE": "SET",
-    "NEW": "SET",
     "COPY": "SET",
     "MOVE": "SET",
     "SWAP": "SET",
@@ -161,82 +203,27 @@ KEYWORD_ALIASES = {
     "FREE": "SET",
     "LOCK": "SET",
 
-    # Flow control
+    # ===== Flow control =====
     "IF": "WHEN",
     "THEN": "WHEN",
-    "CASE": "WHEN",
     "EQ": "WHEN",
     "NE": "WHEN",
     "GT": "WHEN",
     "LT": "WHEN",
     "GE": "WHEN",
     "LE": "WHEN",
-    "AND": "AND",
-    "OR": "OR",
-    "NOT": "NOT",
 
-    # Math / generic command aliases
-    "ADD": "OUT",
-    "SUB": "OUT",
-    "MUL": "OUT",
-    "DIV": "OUT",
-    "MOD": "OUT",
-    "INC": "OUT",
-    "DEC": "OUT",
-    "POWER": "OUT",
-    "ROOT": "OUT",
-    "ABS": "OUT",
-    "ROUND": "OUT",
-    "FLOOR": "OUT",
-    "CEIL": "OUT",
-    "MAX": "OUT",
-    "MIN": "OUT",
-    "AVG": "OUT",
-    "SUM": "OUT",
-    "COUNT": "OUT",
-    "RANDOM": "OUT",
-    "CLAMP": "OUT",
-
-    # System / data aliases
-    "ARRAY": "OUT",
-    "LIST": "OUT",
-    "TEXT": "OUT",
-    "FILE": "OUT",
-    "NET": "OUT",
-    "SYSTEMOS": "OUT",
-    "SECURE": "OUT",
-    "DATA": "OUT",
-    "TABLE": "OUT",
-    "ROW": "OUT",
-    "COLUMN": "OUT",
-    "CELL": "OUT",
-
-    # Loop
-    "FOR": "LOOP",
-    "WHILE": "LOOP",
+    # ===== Loop variants =====
     "UNTIL": "LOOP",
     "REPEAT": "LOOP",
-    "FOREACH": "LOOP",
-    "BREAK": "BREAK",
-    "CONTINUE": "CONTINUE",
-    "STOP": "EXIT",
-    "PAUSE": "EXIT",
-    "WAIT": "EXIT",
-    "DELAY": "EXIT",
-    "SKIP": "EXIT",
-    "GOTO": "EXIT",
-    "LABEL": "EXIT",
-    "JUMP": "EXIT",
-    "RUN": "EXIT",
+    "DO": "LOOP",
 
-    # Functions
-    "FUNC": "FUNC",
+    # ===== Functions =====
     "FUNCTION": "FUNC",
     "PARAM": "FUNC",
     "ARG": "FUNC",
     "CALLFUNC": "FUNC",
     "INLINE": "FUNC",
-    "LAMBDA": "FUNC",
     "RECURSE": "FUNC",
     "OVERLOAD": "FUNC",
     "EXTEND": "FUNC",
@@ -245,76 +232,219 @@ KEYWORD_ALIASES = {
     "EVENT": "FUNC",
     "TRIGGER": "FUNC",
     "LISTEN": "FUNC",
-    "ASYNC": "FUNC",
     "SYNC": "FUNC",
     "THREAD": "FUNC",
     "PROCESS": "FUNC",
+    "YIELD": "FUNC",
 
-    # Arrays
-    "ARRAY": "OUT",
-    "LIST": "OUT",
-    "PUSH": "OUT",
-    "POP": "OUT",
-    "ADDSET": "OUT",
-    "REMOVESET": "OUT",
-    "INSERT": "OUT",
-    "DELETEAT": "OUT",
-    "GETAT": "OUT",
-    "SETAT": "OUT",
-    "FIRST": "OUT",
-    "LAST": "OUT",
-    "SIZE": "OUT",
-    "LENGTH": "OUT",
-    "SORT": "OUT",
-    "REVERSE": "OUT",
-    "FILTER": "OUT",
-    "MAP": "OUT",
-    "MERGE": "OUT",
-    "SPLIT": "OUT",
+    # ===== Math Operations =====
+    "ADD": "MATH",
+    "SUB": "MATH",
+    "MUL": "MATH",
+    "DIV": "MATH",
+    "MOD": "MATH",
+    "INC": "MATH",
+    "DEC": "MATH",
+    "POWER": "MATH",
+    "ROOT": "MATH",
+    "SQRT": "MATH",
+    "ABS": "MATH",
+    "ROUND": "MATH",
+    "FLOOR": "MATH",
+    "CEIL": "MATH",
+    "TRUNC": "MATH",
+    "MAX": "MATH",
+    "MIN": "MATH",
+    "AVG": "MATH",
+    "SUM": "MATH",
+    "COUNT": "MATH",
+    "RANDOM": "MATH",
+    "CLAMP": "MATH",
+    "SIGN": "MATH",
+    "EXP": "MATH",
+    "LN": "MATH",
+    "LOG": "MATH",
+    "LOG10": "MATH",
+    "SIN": "MATH",
+    "COS": "MATH",
+    "TAN": "MATH",
+    "ASIN": "MATH",
+    "ACOS": "MATH",
+    "ATAN": "MATH",
 
-    # Strings
-    "TEXT": "OUT",
-    "CHAR": "OUT",
-    "STR": "OUT",
-    "JOIN": "OUT",
-    "CUT": "OUT",
-    "SLICE": "OUT",
-    "REPLACE": "OUT",
-    "SEARCH": "OUT",
-    "FINDSTR": "OUT",
-    "MATCHSTR": "OUT",
-    "UPPER": "OUT",
-    "LOWER": "OUT",
-    "TRIM": "OUT",
-    "SPACE": "OUT",
-    "FORMAT": "OUT",
-    "CONCAT": "OUT",
-    "PARSE": "OUT",
-    "ENCODE": "OUT",
-    "DECODE": "OUT",
-    "COUNTCHAR": "OUT",
+    # ===== String Operations =====
+    "TEXT": "STRING",
+    "CHAR": "STRING",
+    "STR": "STRING",
+    "JOIN": "STRING",
+    "CUT": "STRING",
+    "SLICE": "STRING",
+    "SUBSTR": "STRING",
+    "REPLACE": "STRING",
+    "UPPER": "STRING",
+    "LOWER": "STRING",
+    "TRIM": "STRING",
+    "SPACE": "STRING",
+    "FORMAT": "STRING",
+    "CONCAT": "STRING",
+    "PARSE": "STRING",
+    "ENCODE": "STRING",
+    "DECODE": "STRING",
+    "COUNTCHAR": "STRING",
+    "STARTSWITH": "STRING",
+    "ENDSWITH": "STRING",
+    "CONTAINS": "STRING",
+    "REVERSE": "STRING",
+    "REPEAT": "STRING",
+    "SPLIT": "STRING",
+    "FINDSTR": "STRING",
+    "MATCHSTR": "STRING",
+    "TOSTRING": "STRING",
 
-    # Type helpers
-    "TYPE": "OUT",
-    "CAST": "OUT",
-    "INT": "OUT",
-    "FLOAT": "OUT",
-    "BOOL": "OUT",
-    "STRINGIFY": "OUT",
-    "NUMBER": "OUT",
-    "DATE": "OUT",
-    "TIME": "OUT",
-    "OBJECT": "OUT",
-    "CLASS": "OUT",
-    "INSTANCE": "OUT",
-    "NULL": "OUT",
-    "EMPTY": "OUT",
-    "VALID": "OUT",
-    "INVALID": "OUT",
-    "CONVERT": "OUT",
-    "FORMATTYPE": "OUT",
-    "DEFAULT": "OUT",
-    "AUTO": "OUT",
+    # ===== Array Operations =====
+    "LIST": "ARRAY",
+    "PUSH": "ARRAY",
+    "POP": "ARRAY",
+    "ADDSET": "ARRAY",
+    "REMOVESET": "ARRAY",
+    "INSERT": "ARRAY",
+    "DELETEAT": "ARRAY",
+    "GETAT": "ARRAY",
+    "SETAT": "ARRAY",
+    "FIRST": "ARRAY",
+    "LAST": "ARRAY",
+    "SIZE": "ARRAY",
+    "LENGTH": "ARRAY",
+    "SORT": "ARRAY",
+    "REVERSE": "ARRAY",
+    "FILTER": "ARRAY",
+    "MAP": "ARRAY",
+    "REDUCE": "ARRAY",
+    "FOREACH": "ARRAY",
+    "MERGE": "ARRAY",
+    "SPLIT": "ARRAY",
+    "FLATTEN": "ARRAY",
+    "FLAT": "ARRAY",
+    "UNIQUE": "ARRAY",
+    "FIND": "ARRAY",
+    "FINDINDEX": "ARRAY",
+    "INCLUDES": "ARRAY",
+    "INDEXOF": "ARRAY",
+    "SHIFT": "ARRAY",
+    "UNSHIFT": "ARRAY",
+    "SLICE": "ARRAY",
+    "SPLICE": "ARRAY",
+    "CONCAT": "ARRAY",
+    "FILL": "ARRAY",
+    "COPY": "ARRAY",
+
+    # ===== Map/Object Operations =====
+    "KEYS": "MAP",
+    "VALUES": "MAP",
+    "ENTRIES": "MAP",
+    "HAS": "MAP",
+    "CLEAR": "MAP",
+    "MERGE": "MAP",
+    "PROPERTY": "MAP",
+    "PROP": "MAP",
+
+    # ===== Type Operations =====
+    "TYPE_OF": "TYPE",
+    "TYPEOF": "TYPE",
+    "IS": "TYPE",
+    "AS": "CAST",
+    "INT": "CAST",
+    "FLOAT": "CAST",
+    "BOOL": "CAST",
+    "STRINGIFY": "CAST",
+    "NUMBER": "CAST",
+    "DATE": "CAST",
+    "TIME": "CAST",
+    "INSTANCE": "TYPE",
+    "EMPTY": "TYPE",
+    "VALID": "TYPE",
+    "INVALID": "TYPE",
+    "CONVERT": "TYPE",
+    "FORMATTYPE": "TYPE",
+    "DEFAULT": "TYPE",
+    "AUTO": "TYPE",
+
+    # ===== File I/O =====
+    "FILE": "IN",
+    "FILE_READ": "IN",
+    "FILE_WRITE": "WRITE",
+    "FILE_APPEND": "WRITE",
+    "FILE_EXISTS": "IN",
+    "FILE_SIZE": "IN",
+    "FILE_DELETE": "DELETE",
+    "FILE_COPY": "COPY",
+    "FILE_MOVE": "MOVE",
+    "DIR_CREATE": "CREATE",
+    "DIR_EXISTS": "CHECK",
+    "DIR_LIST": "READ",
+    "DIR_DELETE": "DELETE",
+    "PATH": "IN",
+
+    # ===== System Operations =====
+    "SYSTEMOS": "OUT",
+    "SYSTEM": "OUT",
+    "ENV": "IN",
+    "ARGV": "IN",
+    "GETPID": "IN",
+    "SLEEP": "OUT",
+    "TIME": "IN",
+    "TIMESTAMP": "IN",
+    "SEED": "MATH",
+    "VERSION": "OUT",
+
+    # ===== Security/Hash =====
+    "SECURE": "OUT",
+    "HASH": "OUT",
+    "MD5": "OUT",
+    "SHA": "OUT",
+    "SHA1": "OUT",
+    "SHA256": "OUT",
+    "SHA512": "OUT",
+    "BASE64": "OUT",
+    "ENCODE64": "ENCODE",
+    "DECODE64": "DECODE",
+    "HEX": "OUT",
+
+    # ===== Data/JSON =====
+    "DATA": "OUT",
+    "TABLE": "ARRAY",
+    "ROW": "ARRAY",
+    "COLUMN": "ARRAY",
+    "CELL": "ARRAY",
+    "JSON": "OUT",
+    "YAML": "OUT",
+    "PARSE_JSON": "PARSE",
+    "STRINGIFY_JSON": "PARSE",
+
+    # ===== Logic Gates =====
+    "XOR": "AND",
+    "NAND": "AND",
+    "NOR": "OR",
+
+    # ===== Advanced =====
+    "GENERATOR": "FUNC",
+    "NEXT": "FUNC",
+    "ITERATOR": "FUNC",
+    "ENUM": "TYPE",
+    "STRUCT": "TYPE",
+    "UNION": "TYPE",
+    "REGEX": "STRING",
+    "PATTERN": "STRING",
+    "MATCH": "STRING",
+    "DESTRUCTURE": "SET",
+    "SPREAD": "SET",
+    "REST": "SET",
+
+    # ===== Promise/Callback =====
+    "PROMISE": "FUNC",
+    "THEN": "FUNC",
+    "CATCH": "FUNC",
+    "FINALLY": "FUNC",
 }
 
 KEYWORDS = CANONICAL_KEYWORDS | set(KEYWORD_ALIASES.keys()) | set(KEYWORD_ALIASES.values())
@@ -329,677 +459,67 @@ def normalize_keyword(keyword):
 # =====================================
 
 SYMBOLS = {
-
+    # Arithmetic
     "+",
     "-",
     "*",
     "/",
     "%",
-    "=",
+    "**",  # Power
 
+    # Assignment
+    "=",
+    "+=",
+    "-=",
+    "*=",
+    "/=",
+    "%=",
+    "**=",
+
+    # Comparison
     "==",
     "!=",
-
     "<",
     "<=",
-
     ">",
     ">=",
+    "===",
+    "!==",
 
+    # Logical
+    "&&",
+    "||",
+    "!",
+
+    # Bitwise
+    "&",
+    "|",
+    "^",
+    "~",
+    "<<",
+    ">>",
+    ">>>",
+
+    # Brackets
     "(",
     ")",
-
     "{",
     "}",
-
     "[",
     "]",
 
+    # Delimiters
     ",",
     ".",
-    ":"
+    ":",
+    ";",
+    "->",
+    "=>",
+    "...",  # Spread/Rest
+
+    # Other
+    "?",
+    "@",
+    "#",
+    "$",
 }
-
-"""
-ZeroOne Compiler
-
-errors.py
-
-Version 2.0.0
-"""
-
-
-class ZeroOneError(Exception):
-    """
-    Base class of all ZeroOne errors.
-    """
-
-    def __init__(
-        self,
-        message
-    ):
-
-        super().__init__(
-            message
-        )
-
-
-# =====================================
-# Lexer
-# =====================================
-
-class LexerError(
-    ZeroOneError
-):
-
-    def __init__(
-        self,
-        message
-    ):
-
-        super().__init__(
-            message
-        )
-
-
-# =====================================
-# Parser
-# =====================================
-
-class ParserError(
-    ZeroOneError
-):
-
-    def __init__(
-        self,
-        message
-    ):
-
-        super().__init__(
-            message
-        )
-
-
-# =====================================
-# Generator
-# =====================================
-
-class GeneratorError(
-    ZeroOneError
-):
-
-    def __init__(
-        self,
-        message
-    ):
-
-        super().__init__(
-            message
-        )
-
-
-# =====================================
-# Assembler
-# =====================================
-
-class AssemblerError(
-    ZeroOneError
-):
-
-    def __init__(
-        self,
-        message
-    ):
-
-        super().__init__(
-            message
-        )
-
-
-# =====================================
-# ByteCode
-# =====================================
-
-class ByteCodeError(
-    ZeroOneError
-):
-
-    def __init__(
-        self,
-        message
-    ):
-
-        super().__init__(
-            message
-        )
-
-
-# =====================================
-# Virtual Machine
-# =====================================
-
-class VMError(
-    ZeroOneError
-):
-
-    def __init__(
-        self,
-        message
-    ):
-
-        super().__init__(
-            message
-        )
-
-
-# =====================================
-# Compiler
-# =====================================
-
-class CompilerError(
-    ZeroOneError
-):
-
-    def __init__(
-        self,
-        message
-    ):
-
-        super().__init__(
-            message
-        )
-
-
-# =====================================
-# Runtime
-# =====================================
-
-class RuntimeError(
-    ZeroOneError
-):
-
-    def __init__(
-        self,
-        message
-    ):
-
-        super().__init__(
-            message
-        )
-
-
-# =====================================
-# Internal
-# =====================================
-
-class InternalCompilerError(
-    ZeroOneError
-):
-
-    def __init__(
-        self,
-        message="Internal compiler error."
-    ):
-
-        super().__init__(
-            message
-        )
-
-"""
-ZeroOne Compiler
-
-ast.py
-
-Version 2.0.0
-"""
-
-
-# =====================================
-# Base
-# =====================================
-
-class ASTNode:
-    """
-    Base class of all AST nodes.
-    """
-    pass
-
-
-# =====================================
-# Program
-# =====================================
-
-class ProgramNode(ASTNode):
-
-    def __init__(self, statements=None):
-
-        if statements is None:
-            statements = []
-
-        self.statements = statements
-
-    def add(self, statement):
-        self.statements.append(statement)
-
-
-# =====================================
-# Literal
-# =====================================
-
-class NumberNode(ASTNode):
-
-    def __init__(self, value):
-        self.value = value
-
-
-class StringNode(ASTNode):
-
-    def __init__(self, value):
-        self.value = value
-
-
-class BooleanNode(ASTNode):
-
-    def __init__(self, value):
-        self.value = bool(value)
-
-
-class IdentifierNode(ASTNode):
-
-    def __init__(self, name):
-        self.name = name
-
-
-# =====================================
-# Expression
-# =====================================
-
-class BinaryOperationNode(ASTNode):
-
-    def __init__(
-        self,
-        left,
-        operator,
-        right
-    ):
-
-        self.left = left
-        self.operator = operator
-        self.right = right
-
-
-class UnaryOperationNode(ASTNode):
-
-    def __init__(
-        self,
-        operator,
-        value
-    ):
-
-        self.operator = operator
-        self.value = value
-
-
-class FunctionCallNode(ASTNode):
-
-    def __init__(
-        self,
-        name,
-        arguments
-    ):
-
-        self.name = name
-        self.arguments = arguments
-
-
-# =====================================
-# Statement
-# =====================================
-
-class SetNode(ASTNode):
-
-    def __init__(
-        self,
-        name,
-        value
-    ):
-
-        self.name = name
-        self.value = value
-
-
-class OutNode(ASTNode):
-
-    def __init__(
-        self,
-        value
-    ):
-
-        self.value = value
-
-
-class ReturnNode(ASTNode):
-
-    def __init__(
-        self,
-        value
-    ):
-
-        self.value = value
-
-
-class ExitNode(ASTNode):
-    pass
-
-
-class ImportNode(ASTNode):
-
-    def __init__(
-        self,
-        filename
-    ):
-
-        self.filename = filename
-
-
-class AssetNode(ASTNode):
-
-    def __init__(
-        self,
-        filename
-    ):
-
-        self.filename = filename
-
-
-# =====================================
-# Control
-# =====================================
-
-class WhenNode(ASTNode):
-
-    def __init__(
-        self,
-        condition,
-        body,
-        else_body=None
-    ):
-
-        self.condition = condition
-        self.body = body
-
-        if else_body is None:
-            else_body = []
-
-        self.else_body = else_body
-
-
-class LoopNode(ASTNode):
-
-    def __init__(
-        self,
-        count,
-        body
-    ):
-
-        self.count = count
-        self.body = body
-
-
-class BreakNode(ASTNode):
-    pass
-
-
-class ContinueNode(ASTNode):
-    pass
-
-
-# =====================================
-# Function
-# =====================================
-
-class FunctionNode(ASTNode):
-
-    def __init__(
-        self,
-        name,
-        parameters,
-        body
-    ):
-
-        self.name = name
-        self.parameters = parameters
-        self.body = body
-
-
-# =====================================
-# Future
-# =====================================
-
-class ArrayNode(ASTNode):
-
-    def __init__(
-        self,
-        elements
-    ):
-
-        self.elements = elements
-
-
-class IndexNode(ASTNode):
-
-    def __init__(
-        self,
-        target,
-        index
-    ):
-
-        self.target = target
-        self.index = index
-
-
-class PropertyNode(ASTNode):
-
-    def __init__(
-        self,
-        target,
-        name
-    ):
-
-        self.target = target
-        self.name = name
-
-"""
-ZeroOne Compiler
-
-opcode.py
-
-Version 2.0.0
-"""
-
-
-class OpCode:
-
-    # =====================================
-    # Stack
-    # =====================================
-
-    PUSH = 1
-    POP = 2
-    DUP = 3
-    SWAP = 4
-
-
-    # =====================================
-    # Memory
-    # =====================================
-
-    STORE = 10
-    LOAD = 11
-
-
-    # =====================================
-    # Arithmetic
-    # =====================================
-
-    ADD = 20
-    SUB = 21
-    MUL = 22
-    DIV = 23
-    MOD = 24
-
-    NEG = 25
-
-
-    # =====================================
-    # Compare
-    # =====================================
-
-    EQ = 30
-    NE = 31
-    LT = 32
-    LE = 33
-    GT = 34
-    GE = 35
-
-
-    # =====================================
-    # Logic
-    # =====================================
-
-    AND = 40
-    OR = 41
-    NOT = 42
-
-
-    # =====================================
-    # Jump
-    # =====================================
-
-    JMP = 50
-
-    JMP_IF_TRUE = 51
-
-    JMP_IF_FALSE = 52
-
-    LABEL = 53
-
-
-    # =====================================
-    # Function
-    # =====================================
-
-    CALL = 60
-
-    RETURN = 61
-
-
-    # =====================================
-    # Output
-    # =====================================
-
-    PRINT = 70
-
-
-    # =====================================
-    # Array (Future)
-    # =====================================
-
-    ARRAY_NEW = 80
-
-    ARRAY_GET = 81
-
-    ARRAY_SET = 82
-
-    ARRAY_LENGTH = 83
-
-
-    # =====================================
-    # Object (Future)
-    # =====================================
-
-    LOAD_PROPERTY = 90
-
-    STORE_PROPERTY = 91
-
-
-    # =====================================
-    # System
-    # =====================================
-
-    EXIT = 255
-
-
-    # =====================================
-    # Debug
-    # =====================================
-
-    @staticmethod
-    def name(code):
-
-        table = {
-
-            # Stack
-            OpCode.PUSH:"PUSH",
-            OpCode.POP:"POP",
-            OpCode.DUP:"DUP",
-            OpCode.SWAP:"SWAP",
-
-            # Memory
-            OpCode.STORE:"STORE",
-            OpCode.LOAD:"LOAD",
-
-            # Arithmetic
-            OpCode.ADD:"ADD",
-            OpCode.SUB:"SUB",
-            OpCode.MUL:"MUL",
-            OpCode.DIV:"DIV",
-            OpCode.MOD:"MOD",
-            OpCode.NEG:"NEG",
-
-            # Compare
-            OpCode.EQ:"EQ",
-            OpCode.NE:"NE",
-            OpCode.LT:"LT",
-            OpCode.LE:"LE",
-            OpCode.GT:"GT",
-            OpCode.GE:"GE",
-
-            # Logic
-            OpCode.AND:"AND",
-            OpCode.OR:"OR",
-            OpCode.NOT:"NOT",
-
-            # Jump
-            OpCode.JMP:"JMP",
-            OpCode.JMP_IF_TRUE:"JMP_IF_TRUE",
-            OpCode.JMP_IF_FALSE:"JMP_IF_FALSE",
-            OpCode.LABEL:"LABEL",
-
-            # Function
-            OpCode.CALL:"CALL",
-            OpCode.RETURN:"RETURN",
-
-            # Output
-            OpCode.PRINT:"PRINT",
-
-            # Array
-            OpCode.ARRAY_NEW:"ARRAY_NEW",
-            OpCode.ARRAY_GET:"ARRAY_GET",
-            OpCode.ARRAY_SET:"ARRAY_SET",
-            OpCode.ARRAY_LENGTH:"ARRAY_LENGTH",
-
-            # Object
-            OpCode.LOAD_PROPERTY:"LOAD_PROPERTY",
-            OpCode.STORE_PROPERTY:"STORE_PROPERTY",
-
-            # System
-            OpCode.EXIT:"EXIT"
-
-        }
-
-        return table.get(
-            code,
-            "UNKNOWN"
-        )
-
