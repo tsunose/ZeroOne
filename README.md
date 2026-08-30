@@ -1,8 +1,27 @@
-# ZeroOne V2.0.2
+# ZeroOne V2.0.3
 
-ZeroOne V2.0.2 is a bug-fix release focused on compiler/VM correctness and the path toward self-hosting.
+ZeroOne V2.0.3 is a bug-fix release that corrects two compiler-generation
+issues found while testing V2.0.2, both directly relevant to the
+self-hosting effort.
 
-## V2.0.2 changes
+## V2.0.3 changes
+
+- Fixed `CONTINUE` inside a `FOR` loop causing an infinite loop: the
+  update step (e.g. `SET i = i + 1`) is no longer skipped. `FOR` loops
+  now have a dedicated continue target placed right before the update
+  step, separate from the condition-check target used by `BREAK` /
+  `LOOP` / `WHILE` / `FOREACH`.
+- Fixed function argument-count checking so it also applies to `FUNC`
+  definitions nested inside `WHEN`, `SWITCH`, `LOOP`, `WHILE`, `FOR`,
+  `FOREACH`, and `TRY`/`CATCH`/`FINALLY` blocks, not just top-level
+  definitions. Previously, a mismatched-argument-count call to a nested
+  function silently corrupted the VM operand stack instead of failing
+  to compile.
+
+See `CHANGELOG_v2.0.3.md` for the full technical detail on both fixes,
+including root cause and reproduction steps.
+
+## V2.0.2 changes (carried forward)
 
 - Common built-in names such as `ADD`, `SIZE`, `SORT`, `LENGTH`, `PUSH`, `POP`, `PARSE`, and `FORMAT` are no longer globally reserved by the lexer.
 - Legacy line-style aliases remain supported where practical, while built-in calls are resolved by the compiler.
@@ -13,7 +32,6 @@ ZeroOne V2.0.2 is a bug-fix release focused on compiler/VM correctness and the p
 - Function calls now report argument-count errors during compilation instead of causing VM stack underflow.
 - `FOREACH` now uses a private iterator-end sentinel so a real `NULL` element does not terminate iteration.
 - `main.py` is now a compatibility entry point for the current `zo.py` CLI instead of depending on the missing `sample.zo`.
-- Added V2.0.2 regression tests for the fixes above.
 
 ## Example
 
@@ -68,6 +86,14 @@ Target:
 ZeroOne compiler -> ZeroOne bytecode -> ZeroOne VM
 ```
 
-**Status: ZeroOne V2.0.2 - Development / bug-fix release**
+## Known open items (not yet fixed / not yet confirmed as bugs)
+
+- `>>` (`RSHIFT`) and `>>>` (`ARSHIFT`) currently always produce the same
+  result (both are signed/arithmetic shifts). This looks like an
+  intentional design choice rather than a bug, but is unconfirmed.
+- The `NEW` keyword is reserved but not yet wired up in the parser —
+  there is currently no way to instantiate a `CLASS` from ZeroOne source.
+
+**Status: ZeroOne V2.0.3 - Development / bug-fix release**
 
 The project remains under development. The priority is language completeness, reliable compiler/VM behavior, and eventual Python independence.
