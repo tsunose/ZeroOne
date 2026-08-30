@@ -1,0 +1,38 @@
+name: ZeroOne Tests
+
+on:
+  push:
+    branches:
+      - main
+      - github-actions
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: ソースコードを取得
+        uses: actions/checkout@v6
+
+      - name: Pythonをセットアップ
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Pythonバージョン確認
+        run: python --version
+
+      - name: ZeroOneバージョン確認
+        run: python zo.py --version
+
+      - name: Hello Worldをコンパイル
+        run: python zo.py compile hello.zo
+
+      - name: Hello Worldを実行
+        run: python zo.py run hello.zbc
