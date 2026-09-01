@@ -2,32 +2,49 @@ name: ZeroOne Tests
 
 on:
   push:
+    branches:
+      - "**"
   pull_request:
+    branches:
+      - "**"
 
 jobs:
   test:
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ZeroOne-V2
 
     steps:
       - name: ソースコードを取得
         uses: actions/checkout@v4
 
       - name: Pythonをセットアップ
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Pythonバージョン確認
         run: python --version
 
-      - name: ZeroOneディレクトリへ移動
-        working-directory: ZeroOne-V2.0.3
+      - name: ZeroOneバージョン確認
         run: python zo.py --version
 
+      - name: Hello Worldテストファイル作成
+        run: |
+          cat > test_ci.zo <<'EOF'
+          SET x = 10
+          SET y = 20
+          SET result = x + y
+          OUT(result)
+          EOF
+
       - name: Hello Worldをコンパイル
-        working-directory: ZeroOne-V2.0.3
-        run: python zo.py compile tests/hello.zo
+        run: python zo.py compile test_ci.zo
 
       - name: Hello Worldを実行
-        working-directory: ZeroOne-V2.0.3
-        run: python zo.py run tests/hello.zbc
+        run: python zo.py run test_ci.zbc
+
+      - name: コンパイル結果を確認
+        run: test -f test_ci.zbc
