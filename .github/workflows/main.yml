@@ -2,15 +2,7 @@ name: ZeroOne Tests
 
 on:
   push:
-    branches:
-      - self-hosting
-      - "self-hosting-*"
-      - main
   pull_request:
-    branches:
-      - self-hosting
-      - main
-  workflow_dispatch:
 
 jobs:
   test:
@@ -18,34 +10,24 @@ jobs:
 
     steps:
       - name: ソースコードを取得
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Pythonをセットアップ
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
       - name: Pythonバージョン確認
         run: python --version
 
-      - name: ZeroOneファイル確認
-        run: |
-          echo "=== Repository ==="
-          pwd
-          echo "=== Files ==="
-          find . -maxdepth 3 -type f | sort
-
-      - name: ZeroOneバージョン確認
+      - name: ZeroOneディレクトリへ移動
+        working-directory: ZeroOne-V2.0.3
         run: python zo.py --version
 
-      - name: Pythonテスト
-        run: |
-          if [ -d tests ]; then
-            python -m pytest tests -v
-          else
-            echo "tests directory not found"
-          fi
+      - name: Hello Worldをコンパイル
+        working-directory: ZeroOne-V2.0.3
+        run: python zo.py compile tests/hello.zo
 
-      - name: ZeroOneテスト
-        run: |
-          python zo.py compile hello.zo
+      - name: Hello Worldを実行
+        working-directory: ZeroOne-V2.0.3
+        run: python zo.py run tests/hello.zbc
