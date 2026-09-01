@@ -3,7 +3,7 @@ ZeroOne Compiler
 
 parser.py
 
-Version 2.0.4 - Extended Parser
+Version 2.0.5 - Extended Parser (Fixed for v2.0.5 keywords)
 """
 
 from compiler.tokens import TokenType, normalize_keyword, KEYWORD_ALIASES
@@ -223,6 +223,23 @@ class Parser:
         return token
 
 
+    def _expect_identifier_or_keyword(self):
+        """
+        Accept both IDENTIFIER and KEYWORD tokens for variable/parameter names.
+        This allows v2.0.5 keywords like LENGTH, CHAR_AT, SIZE to be used as names.
+        """
+        if self.check(TokenType.IDENTIFIER):
+            value = self.current.value
+            self.advance()
+            return value
+        elif self.check(TokenType.KEYWORD):
+            value = self.current.value
+            self.advance()
+            return value
+        else:
+            raise ParserError("Expected identifier or name")
+
+
     def skip_newline(self):
 
         while self.check(
@@ -293,9 +310,9 @@ class Parser:
                 "DATA","TABLE","ROW","COLUMN","CELL","JSON","YAML","PARSE_JSON","STRINGIFY_JSON",
                 "TYPE","CAST","TYPE_OF","TYPEOF","INT","FLOAT","BOOL","STRINGIFY","NUMBER","DATE","TIME","INSTANCE","EMPTY","VALID","INVALID","CONVERT","AUTO",
                 "ADD","SUB","MUL","DIV","MOD","POWER","ROOT","SQRT","ABS","ROUND","FLOOR","CEIL","TRUNC","MAX","MIN","AVG","SUM","COUNT","RANDOM","CLAMP","SIGN","EXP","LN","LOG10","SIN","COS","TAN","ASIN","ACOS","ATAN",
-                "STRING","TEXT","CHAR","STR","JOIN","CUT","SLICE","SUBSTR","REPLACE","UPPER","LOWER","TRIM","SPACE","FORMAT","CONCAT","PARSE","ENCODE","DECODE","COUNTCHAR","STARTSWITH","ENDSWITH","CONTAINS","REVERSE","SPLIT","FINDSTR","MATCHSTR","TOSTRING",
-                "ARRAY","MAP","LIST","PUSH","POP","ADDSET","REMOVESET","INSERT","DELETEAT","GETAT","SETAT","FIRST","LAST","SIZE","LENGTH","SORT","FILTER","REDUCE","MERGE","FLATTEN","FLAT","UNIQUE","FIND","FINDINDEX","INCLUDES","INDEXOF","SHIFT","UNSHIFT","SPLICE","FILL","COPY",
-                "KEYS","VALUES","ENTRIES","HAS","PROPERTY","PROP","REGEX","PATTERN","MATCH","UNION","GENERATOR","NEXT","ITERATOR","DESTRUCTURE","SPREAD","REST","PROMISE","ASYNC","AWAIT","ASSERT","DEBUG","WARN","ERROR","DUMP","DISASM","NOP","NOOP"
+                "STRING","TEXT","CHAR","STR","JOIN","CUT","SLICE","SUBSTR","REPLACE","UPPER","LOWER","TRIM","SPACE","FORMAT","CONCAT","PARSE","ENCODE","DECODE","COUNTCHAR","STARTSWITH","ENDSWITH","CONTAINS","REPEAT","SPLIT","FINDSTR","MATCHSTR","TOSTRING","LENGTH","SIZE","FIRST","LAST",
+                "ARRAY","MAP","LIST","PUSH","POP","ADDSET","REMOVESET","INSERT","DELETEAT","GETAT","SETAT","FIRST","LAST","SIZE","LENGTH","SORT","FILTER","REDUCE","MERGE","FLATTEN","FLAT","UNIQUE","FIND","FINDINDEX","INCLUDES","INDEXOF","SPLICE","SHIFT","UNSHIFT","FILL","COPY",
+                "KEYS","VALUES","ENTRIES","HAS","PROPERTY","PROP","REGEX","PATTERN","MATCH","UNION","GENERATOR","NEXT","ITERATOR","DESTRUCTURE","SPREAD","REST","PROMISE","ASYNC","AWAIT","ASSERT","DEBUG","WARN","ERROR","DUMP","DISASM",
             }
             if self.current.value in extended:
                 return self.parse_builtin_statement()
@@ -470,9 +487,9 @@ class Parser:
 
         is_const = normalize_keyword(keyword) == "CONST"
 
-        name = self.expect(
-            TokenType.IDENTIFIER
-        ).value
+        # v2.0.5 fix: Allow KEYWORD tokens as variable names
+        # This enables using v2.0.5 keywords (LENGTH, CHAR_AT, SIZE, etc.) as identifiers
+        name = self._expect_identifier_or_keyword()
 
         # Property assignment: SET object.field = value
         if self.check_symbol("."):
@@ -944,7 +961,8 @@ class Parser:
 
         self.expect_keyword("FOREACH")
 
-        variable = self.expect(TokenType.IDENTIFIER).value
+        # v2.0.5 fix: Allow KEYWORD tokens as loop variable names
+        variable = self._expect_identifier_or_keyword()
 
         self.expect_keyword("IN")
 
@@ -1004,7 +1022,8 @@ class Parser:
                         self.advance()
                     if self.check_symbol(":"):
                         self.advance()
-                        variable = self.expect(TokenType.IDENTIFIER).value
+                        # v2.0.5 fix: Allow KEYWORD tokens for exception variable
+                        variable = self._expect_identifier_or_keyword()
                     self.expect_symbol(")")
 
                 self.skip_newline()
@@ -1067,9 +1086,8 @@ class Parser:
 
         self.expect_keyword("FUNC")
 
-        name = self.expect(
-            TokenType.IDENTIFIER
-        ).value
+        # v2.0.5 fix: Allow KEYWORD tokens as function names
+        name = self._expect_identifier_or_keyword()
 
         is_async = False
         if self.check_keyword("ASYNC"):
@@ -1081,7 +1099,8 @@ class Parser:
         if self.check_symbol("("):
             self.advance()
             while not self.check_symbol(")"):
-                param_name = self.expect(TokenType.IDENTIFIER).value
+                # v2.0.5 fix: Allow KEYWORD tokens as parameter names
+                param_name = self._expect_identifier_or_keyword()
                 default_value = None
                 is_rest = False
 
@@ -1134,12 +1153,14 @@ class Parser:
 
         self.expect_keyword("CLASS")
 
-        name = self.expect(TokenType.IDENTIFIER).value
+        # v2.0.5 fix: Allow KEYWORD tokens as class names
+        name = self._expect_identifier_or_keyword()
 
         extends = None
         if self.check_keyword("EXTENDS"):
             self.advance()
-            extends = self.expect(TokenType.IDENTIFIER).value
+            # v2.0.5 fix: Allow KEYWORD tokens for parent class names
+            extends = self._expect_identifier_or_keyword()
 
         self.skip_newline()
 
@@ -1592,7 +1613,7 @@ class Parser:
 
         # Reserved operation used as an expression (e.g. SET x = ADD(1, 2)).
         if self.current is not None and self.current.type == TokenType.KEYWORD:
-            if not any(self.check_keyword(k) for k in ("LAMBDA","TRUE","FALSE","NULL","EXIT","RETURN","END","ELSE","CASE","DEFAULT","BREAK","CONTINUE","SET","LET","CONST","FUNC","CLASS","IMPORT","ASSET","WHEN","SWITCH","LOOP","WHILE","FOR","FOREACH","TRY","CATCH","FINALLY","THROW")):
+            if not any(self.check_keyword(k) for k in ("LAMBDA","TRUE","FALSE","NULL","EXIT","RETURN","END","ELSE","CASE","DEFAULT","BREAK","CONTINUE","SET","LET","CONST","FUNC","CLASS","IMPORT","EXPORT","ENUM","STRUCT","TRY","CATCH","FINALLY","THROW","WHEN","IF","SWITCH","LOOP","WHILE","FOR","FOREACH")):
                 return self.parse_builtin_statement()
 
         # Identifier
@@ -1726,7 +1747,8 @@ class Parser:
 
             while not self.check_symbol(")"):
 
-                param_name = self.expect(TokenType.IDENTIFIER).value
+                # v2.0.5 fix: Allow KEYWORD tokens as lambda parameter names
+                param_name = self._expect_identifier_or_keyword()
 
                 params.append(ParamNode(param_name))
 
