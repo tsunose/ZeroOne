@@ -1,3 +1,0 @@
-SET x = TRUE ? 10 : 20
-OUT x
-EXIT
