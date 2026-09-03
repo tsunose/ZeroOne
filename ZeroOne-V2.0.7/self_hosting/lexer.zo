@@ -1,0 +1,113 @@
+// ==================================================
+// ZeroOne自身によるLexer（自己ホスティングの最初の一歩）
+// ==================================================
+//
+// これはPython製のcompiler/lexer.pyの完全な置き換えではありません。
+// V2.0.6で修正・追加された以下の機能が実際にセルフホスティングの
+// 土台として使えることを示すための、最小限だが本物の動作するLexerです。
+//
+//   - STRUCT (Token)
+//   - ENUM (TokenType)
+//   - 予約語と衝突するプロパティ名 (token.type / token.value)
+//   - 文字列操作のNative Function (CHARAT, LENGTH, ISDIGIT, ISLETTER, ISSPACE)
+//   - 配列操作 (PUSH)
+//
+// 対応しているのはごく小さなサブセットです：
+//   - 整数（複数桁）
+//   - 識別子（英字始まり、英数字の連続）
+//   - 記号1文字（+ - * / ( ) など）
+//   - 空白の読み飛ばし
+//
+// 文字列リテラル・コメント・複数文字記号（>= など）には未対応です。
+// これは「Pythonから完全脱却したLexer」ではなく、「ZeroOneでLexerを
+// 書くこと自体が現実的に可能になったこと」を確認するためのものです。
+
+ENUM TokenType
+    EOF
+    IDENTIFIER
+    NUMBER
+    SYMBOL
+END
+
+STRUCT Token
+    type
+    value
+    pos
+END
+
+FUNC isIdentifierStart(ch)
+    RETURN ISLETTER(ch) OR ch == "_"
+END
+
+FUNC isIdentifierPart(ch)
+    RETURN ISLETTER(ch) OR ISDIGIT(ch) OR ch == "_"
+END
+
+FUNC tokenize(source)
+
+    SET tokens = []
+    SET pos = 0
+    SET len = LENGTH(source)
+
+    LOOP pos < len
+
+        SET ch = CHARAT(source, pos)
+
+        WHEN ISSPACE(ch)
+            SET pos = pos + 1
+            CONTINUE
+        END
+
+        WHEN ISDIGIT(ch)
+            SET start = pos
+            LOOP pos < len
+                WHEN NOT ISDIGIT(CHARAT(source, pos))
+                    BREAK
+                END
+                SET pos = pos + 1
+            END
+            SET value = SUBSTR(source, start, pos)
+            PUSH(tokens, Token(TokenType.NUMBER, value, start))
+            CONTINUE
+        END
+
+        WHEN isIdentifierStart(ch)
+            SET start = pos
+            LOOP pos < len
+                WHEN NOT isIdentifierPart(CHARAT(source, pos))
+                    BREAK
+                END
+                SET pos = pos + 1
+            END
+            SET value = SUBSTR(source, start, pos)
+            PUSH(tokens, Token(TokenType.IDENTIFIER, value, start))
+            CONTINUE
+        END
+
+        // それ以外は1文字の記号として扱う
+        PUSH(tokens, Token(TokenType.SYMBOL, ch, pos))
+        SET pos = pos + 1
+
+    END
+
+    PUSH(tokens, Token(TokenType.EOF, "", pos))
+
+    RETURN tokens
+
+END
+
+// ==================================================
+// デモ・簡易セルフテスト
+// ==================================================
+// `python zo.py run-source self_hosting/lexer.zo` で単体実行できます。
+
+SET source = "x1 + 42 * y"
+SET tokens = tokenize(source)
+
+SET printToken = LAMBDA (t) => OUT(STR(t.type) + ":" + t.value + " ")
+
+FOREACH t IN tokens
+    printToken(t)
+END
+
+EXIT

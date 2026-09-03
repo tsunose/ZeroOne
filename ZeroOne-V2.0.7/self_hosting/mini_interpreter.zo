@@ -1,0 +1,250 @@
+// ==================================================
+// mini_interpreter.zo — 変数を持つミニインタプリタ
+// ==================================================
+//
+// self_hosting/calculator.zo（式の評価だけ）から一段階進んで、
+// 「複数の文」と「変数（SET文と参照）」を持つ小さな言語を
+// ZeroOne自身で実装したものです。
+//
+// self_hosting/lexer_lib.zo を再利用し、その上に
+//   文の並び (statement*)
+//   変数への代入 (SET x = expr;)
+//   出力 (OUT(expr);)
+//   式の中での変数参照
+// を実装しています。
+//
+// 対応する文法：
+//   program   := statement*
+//   statement := "SET" IDENTIFIER "=" expr ";"
+//              | "OUT" "(" expr ")" ";"
+//   expr      := 四則演算 + 括弧 + 単項マイナス + 変数参照 + 数値
+//              (calculator.zo と同じ優先順位)
+//
+// 変数の環境（環境＝名前→値の対応表）は OBJECT() を使い、
+// 実行時に決まる変数名をキーとして env[name] という形で
+// 読み書きします（V2.0.7で修正した「辞書への動的キー書き込み」が
+// ここで実際に必要になっています）。
+
+IMPORT "lexer_lib.zo"
+
+ENUM NodeType
+    NUMBER
+    VAR
+    ADD
+    SUB
+    MUL
+    DIV
+    NEG
+    ASSIGN
+    PRINT
+END
+
+STRUCT Node
+    type
+    left
+    right
+    value
+    name
+END
+
+// ===== パーサー用のカーソル =====
+
+FUNC newState(tokens)
+    SET state = OBJECT()
+    state.tokens = tokens
+    state.pos = 0
+    RETURN state
+END
+
+FUNC peek(state)
+    RETURN state.tokens[state.pos]
+END
+
+FUNC advance(state)
+    SET t = state.tokens[state.pos]
+    state.pos = state.pos + 1
+    RETURN t
+END
+
+FUNC isSymbol(t, s)
+    RETURN t.type == TokenType.SYMBOL AND t.value == s
+END
+
+FUNC expectSymbol(state, s)
+    SET t = advance(state)
+    WHEN NOT isSymbol(t, s)
+        THROW "Expected '" + s + "' but got '" + t.value + "'"
+    END
+END
+
+// ===== 式のパーサー（calculator.zo と同じ優先順位、変数参照を追加） =====
+
+FUNC parseFactor(state)
+
+    SET t = peek(state)
+
+    WHEN t.type == TokenType.NUMBER
+        advance(state)
+        RETURN Node(NodeType.NUMBER, NULL, NULL, INT(t.value), NULL)
+    END
+
+    WHEN t.type == TokenType.IDENTIFIER
+        advance(state)
+        RETURN Node(NodeType.VAR, NULL, NULL, NULL, t.value)
+    END
+
+    WHEN isSymbol(t, "(")
+        advance(state)
+        SET inner = parseExpr(state)
+        expectSymbol(state, ")")
+        RETURN inner
+    END
+
+    WHEN isSymbol(t, "-")
+        advance(state)
+        RETURN Node(NodeType.NEG, parseFactor(state), NULL, NULL, NULL)
+    END
+
+    THROW "Unexpected token: '" + t.value + "'"
+
+END
+
+FUNC parseTerm(state)
+    SET node = parseFactor(state)
+    LOOP isSymbol(peek(state), "*") OR isSymbol(peek(state), "/")
+        SET op = advance(state)
+        SET rhs = parseFactor(state)
+        WHEN op.value == "*"
+            SET node = Node(NodeType.MUL, node, rhs, NULL, NULL)
+        END
+        WHEN op.value == "/"
+            SET node = Node(NodeType.DIV, node, rhs, NULL, NULL)
+        END
+    END
+    RETURN node
+END
+
+FUNC parseExpr(state)
+    SET node = parseTerm(state)
+    LOOP isSymbol(peek(state), "+") OR isSymbol(peek(state), "-")
+        SET op = advance(state)
+        SET rhs = parseTerm(state)
+        WHEN op.value == "+"
+            SET node = Node(NodeType.ADD, node, rhs, NULL, NULL)
+        END
+        WHEN op.value == "-"
+            SET node = Node(NodeType.SUB, node, rhs, NULL, NULL)
+        END
+    END
+    RETURN node
+END
+
+// ===== 文のパーサー =====
+
+FUNC parseStatement(state)
+
+    SET t = peek(state)
+
+    WHEN t.type == TokenType.IDENTIFIER AND t.value == "SET"
+        advance(state)
+        SET nameTok = advance(state)
+        expectSymbol(state, "=")
+        SET expr = parseExpr(state)
+        expectSymbol(state, ";")
+        RETURN Node(NodeType.ASSIGN, expr, NULL, NULL, nameTok.value)
+    END
+
+    WHEN t.type == TokenType.IDENTIFIER AND t.value == "OUT"
+        advance(state)
+        expectSymbol(state, "(")
+        SET expr = parseExpr(state)
+        expectSymbol(state, ")")
+        expectSymbol(state, ";")
+        RETURN Node(NodeType.PRINT, expr, NULL, NULL, NULL)
+    END
+
+    THROW "Unexpected statement starting with: '" + t.value + "'"
+
+END
+
+FUNC parseProgram(state)
+    SET statements = []
+    LOOP peek(state).type != TokenType.EOF
+        PUSH(statements, parseStatement(state))
+    END
+    RETURN statements
+END
+
+// ===== 評価器（envはOBJECT。動的キーで env[name] のように読み書きする） =====
+
+FUNC evaluate(node, env)
+
+    WHEN node.type == NodeType.NUMBER
+        RETURN node.value
+    END
+
+    WHEN node.type == NodeType.VAR
+        WHEN NOT CONTAINS(KEYS(env), node.name)
+            THROW "Undefined variable: " + node.name
+        END
+        RETURN env[node.name]
+    END
+
+    WHEN node.type == NodeType.NEG
+        RETURN 0 - evaluate(node.left, env)
+    END
+
+    WHEN node.type == NodeType.ADD
+        RETURN evaluate(node.left, env) + evaluate(node.right, env)
+    END
+
+    WHEN node.type == NodeType.SUB
+        RETURN evaluate(node.left, env) - evaluate(node.right, env)
+    END
+
+    WHEN node.type == NodeType.MUL
+        RETURN evaluate(node.left, env) * evaluate(node.right, env)
+    END
+
+    WHEN node.type == NodeType.DIV
+        WHEN evaluate(node.right, env) == 0
+            THROW "Division by zero"
+        END
+        RETURN evaluate(node.left, env) / evaluate(node.right, env)
+    END
+
+    THROW "Unknown expression node type"
+
+END
+
+FUNC run(source)
+
+    TRY
+        SET tokens = tokenize(source)
+        SET state = newState(tokens)
+        SET statements = parseProgram(state)
+        SET env = OBJECT()
+
+        FOREACH stmt IN statements
+            WHEN stmt.type == NodeType.ASSIGN
+                env[stmt.name] = evaluate(stmt.left, env)
+            END
+            WHEN stmt.type == NodeType.PRINT
+                OUT(STR(evaluate(stmt.left, env)))
+                OUT("|")
+            END
+        END
+
+    CATCH (Exception: e)
+        OUT("Error: " + e + "|")
+    END
+
+END
+
+// ===== デモ =====
+
+run("SET x = 5; SET y = x * 2 + 1; OUT(y); SET x = x - 1; OUT(x + y);")
+run("SET a = 10; OUT(a / 0);")
+run("OUT(undefined_var);")
+
+EXIT
