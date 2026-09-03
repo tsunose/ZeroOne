@@ -1,0 +1,81 @@
+// ==================================================
+// lexer_lib.zo — self_hosting/lexer.zo のライブラリ版
+// ==================================================
+// デモ実行部分を除き、tokenize関数だけをEXPORTする形にしたもの。
+// IMPORT "lexer_lib.zo" して使う。
+
+ENUM TokenType
+    EOF
+    IDENTIFIER
+    NUMBER
+    SYMBOL
+END
+
+STRUCT Token
+    type
+    value
+    pos
+END
+
+FUNC isIdentifierStart(ch)
+    RETURN ISLETTER(ch) OR ch == "_"
+END
+
+FUNC isIdentifierPart(ch)
+    RETURN ISLETTER(ch) OR ISDIGIT(ch) OR ch == "_"
+END
+
+FUNC tokenize(source)
+
+    SET tokens = []
+    SET pos = 0
+    SET len = LENGTH(source)
+
+    LOOP pos < len
+
+        SET ch = CHARAT(source, pos)
+
+        WHEN ISSPACE(ch)
+            SET pos = pos + 1
+            CONTINUE
+        END
+
+        WHEN ISDIGIT(ch)
+            SET start = pos
+            LOOP pos < len
+                WHEN NOT ISDIGIT(CHARAT(source, pos))
+                    BREAK
+                END
+                SET pos = pos + 1
+            END
+            SET value = SUBSTR(source, start, pos)
+            PUSH(tokens, Token(TokenType.NUMBER, value, start))
+            CONTINUE
+        END
+
+        WHEN isIdentifierStart(ch)
+            SET start = pos
+            LOOP pos < len
+                WHEN NOT isIdentifierPart(CHARAT(source, pos))
+                    BREAK
+                END
+                SET pos = pos + 1
+            END
+            SET value = SUBSTR(source, start, pos)
+            PUSH(tokens, Token(TokenType.IDENTIFIER, value, start))
+            CONTINUE
+        END
+
+        // それ以外は1文字の記号として扱う
+        PUSH(tokens, Token(TokenType.SYMBOL, ch, pos))
+        SET pos = pos + 1
+
+    END
+
+    PUSH(tokens, Token(TokenType.EOF, "", pos))
+
+    RETURN tokens
+
+END
+
+EXPORT tokenize
