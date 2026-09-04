@@ -1,0 +1,191 @@
+// ==================================================
+// calculator.zo — ZeroOneで書いた四則演算インタプリタ
+// ==================================================
+//
+// self_hosting/lexer_lib.zo (トークナイザ) をIMPORTし、
+// その上に「構文解析（優先順位付き）→AST構築→評価」まで
+// すべてZeroOne自身のコードで実装したものです。
+//
+// 使っている機能：
+//   IMPORT / EXPORT   … lexer_lib.zoの再利用
+//   STRUCT            … Token（lexer_lib側）、Node（AST）
+//   ENUM              … TokenType（lexer_lib側）、NodeType
+//   OBJECT            … 構文解析中のカーソル位置を保持する可変状態
+//                        （STRUCT/OBJECTは参照渡しなので、関数の中で
+//                        state.pos を書き換えると呼び出し元にも反映される）
+//   LAMBDA            … 評価器のディスパッチテーブル
+//   TRY / CATCH        … 0除算・構文エラーのハンドリング
+//   FOR / CONTINUE     … デモの複数式ループ
+//
+// 対応する文法（優先順位の低い順）：
+//   expr   := term (("+" | "-") term)*
+//   term   := factor (("*" | "/") factor)*
+//   factor := NUMBER | "(" expr ")" | "-" factor
+
+IMPORT "lexer_lib.zo"
+
+ENUM NodeType
+    NUMBER
+    ADD
+    SUB
+    MUL
+    DIV
+    NEG
+END
+
+STRUCT Node
+    type
+    left
+    right
+    value
+END
+
+// ===== パーサー用のカーソル =====
+
+FUNC newState(tokens)
+    SET state = OBJECT()
+    state.tokens = tokens
+    state.pos = 0
+    RETURN state
+END
+
+FUNC peek(state)
+    RETURN state.tokens[state.pos]
+END
+
+FUNC advance(state)
+    SET t = state.tokens[state.pos]
+    state.pos = state.pos + 1
+    RETURN t
+END
+
+FUNC isSymbol(t, s)
+    RETURN t.type == TokenType.SYMBOL AND t.value == s
+END
+
+// ===== 再帰下降パーサー =====
+
+FUNC parseFactor(state)
+
+    SET t = peek(state)
+
+    WHEN t.type == TokenType.NUMBER
+        advance(state)
+        RETURN Node(NodeType.NUMBER, NULL, NULL, INT(t.value))
+    END
+
+    WHEN isSymbol(t, "(")
+        advance(state)
+        SET inner = parseExpr(state)
+        SET closeTok = advance(state)
+        WHEN NOT isSymbol(closeTok, ")")
+            THROW "Expected ')' but got '" + closeTok.value + "'"
+        END
+        RETURN inner
+    END
+
+    WHEN isSymbol(t, "-")
+        advance(state)
+        RETURN Node(NodeType.NEG, parseFactor(state), NULL, NULL)
+    END
+
+    THROW "Unexpected token: '" + t.value + "'"
+
+END
+
+FUNC parseTerm(state)
+
+    SET node = parseFactor(state)
+
+    LOOP isSymbol(peek(state), "*") OR isSymbol(peek(state), "/")
+        SET op = advance(state)
+        SET rhs = parseFactor(state)
+        WHEN op.value == "*"
+            SET node = Node(NodeType.MUL, node, rhs, NULL)
+        END
+        WHEN op.value == "/"
+            SET node = Node(NodeType.DIV, node, rhs, NULL)
+        END
+    END
+
+    RETURN node
+
+END
+
+FUNC parseExpr(state)
+
+    SET node = parseTerm(state)
+
+    LOOP isSymbol(peek(state), "+") OR isSymbol(peek(state), "-")
+        SET op = advance(state)
+        SET rhs = parseTerm(state)
+        WHEN op.value == "+"
+            SET node = Node(NodeType.ADD, node, rhs, NULL)
+        END
+        WHEN op.value == "-"
+            SET node = Node(NodeType.SUB, node, rhs, NULL)
+        END
+    END
+
+    RETURN node
+
+END
+
+// ===== 評価器 =====
+
+FUNC evaluate(node)
+
+    WHEN node.type == NodeType.NUMBER
+        RETURN node.value
+    END
+
+    WHEN node.type == NodeType.NEG
+        RETURN 0 - evaluate(node.left)
+    END
+
+    WHEN node.type == NodeType.ADD
+        RETURN evaluate(node.left) + evaluate(node.right)
+    END
+
+    WHEN node.type == NodeType.SUB
+        RETURN evaluate(node.left) - evaluate(node.right)
+    END
+
+    WHEN node.type == NodeType.MUL
+        RETURN evaluate(node.left) * evaluate(node.right)
+    END
+
+    WHEN node.type == NodeType.DIV
+        WHEN evaluate(node.right) == 0
+            THROW "Division by zero"
+        END
+        RETURN evaluate(node.left) / evaluate(node.right)
+    END
+
+    THROW "Unknown node type"
+
+END
+
+FUNC run(source)
+
+    TRY
+        SET tokens = tokenize(source)
+        SET state = newState(tokens)
+        SET ast = parseExpr(state)
+        SET result = evaluate(ast)
+        OUT(source + " = " + STR(result))
+    CATCH (Exception: e)
+        OUT(source + " -> Error: " + e)
+    END
+
+END
+
+// ===== デモ =====
+
+SET expressions = ["1 + 2 * 3", "(1 + 2) * 3", "10 - 2 - 3", "2 * (3 + 4) - 5", "-5 + 3", "10 / 0", "1 + )"]
+
+FOREACH expr IN expressions
+    run(expr)
+END
+
+EXIT

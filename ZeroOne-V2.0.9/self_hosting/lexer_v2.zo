@@ -1,0 +1,187 @@
+// ==================================================
+// lexer_v2.zo — 本格拡張版のZeroOne製Lexer（V2.0.9）
+// ==================================================
+//
+// self_hosting/lexer_lib.zo（整数・識別子・1文字記号だけ）から、
+// 実際のZeroOneソースをより広くトークン化できるところまで拡張した。
+//
+// 追加対応：
+//   - 文字列リテラル "..."（\" \\ \n \t のエスケープ対応）
+//   - 小数 (3.14)
+//   - 主要な多文字記号（== != <= >= && || += -= *= /= -> => << >> >>> **）
+//     ※長い記号から先にマッチさせる（例: "==" を "=" 単体より優先）
+//   - // 行コメント
+//
+// まだ対応していないもの（今後の拡張課題）：
+//   - /* */ ブロックコメント
+//   - 三重ドット ... （スプレッド構文）
+//   - テンプレート文字列的な機能
+//
+// このファイルは compiler/lexer.py が生成するトークン列と完全互換な
+// わけではなく（TokenTypeの内部表現が簡略化されている等）、あくまで
+// 「ZeroOneでZeroOneらしいソースをどこまでトークン化できるか」の
+// 進捗確認・土台として位置づけています。
+
+ENUM TokenType
+    EOF
+    IDENTIFIER
+    NUMBER
+    STRING
+    SYMBOL
+END
+
+STRUCT Token
+    type
+    value
+    pos
+END
+
+FUNC isIdentifierStart(ch)
+    RETURN ISLETTER(ch) OR ch == "_"
+END
+
+FUNC isIdentifierPart(ch)
+    RETURN ISLETTER(ch) OR ISDIGIT(ch) OR ch == "_"
+END
+
+// 長い記号から順にマッチを試す（例えば ">>>" は ">>" より先、
+// ">>" は ">" より先に判定しないと、正しい記号として切り出せない）。
+FUNC multiCharSymbols()
+    RETURN [">>>", "===", "!==", "**=", "==", "!=", "<=", ">=", "&&", "||", "+=", "-=", "*=", "/=", "%=", "->", "=>", "<<", ">>", "**"]
+END
+
+FUNC tryMatchMultiChar(source, pos, len)
+    SET symbols = multiCharSymbols()
+    FOREACH sym IN symbols
+        SET symLen = LENGTH(sym)
+        WHEN pos + symLen <= len
+            WHEN SUBSTR(source, pos, pos + symLen) == sym
+                RETURN sym
+            END
+        END
+    END
+    RETURN NULL
+END
+
+FUNC tokenize(source)
+
+    SET tokens = []
+    SET pos = 0
+    SET len = LENGTH(source)
+
+    LOOP pos < len
+
+        SET ch = CHARAT(source, pos)
+
+        WHEN ISSPACE(ch)
+            SET pos = pos + 1
+            CONTINUE
+        END
+
+        // 行コメント //
+        WHEN ch == "/" AND pos + 1 < len AND CHARAT(source, pos + 1) == "/"
+            LOOP pos < len AND CHARAT(source, pos) != NEWLINE_CHAR()
+                SET pos = pos + 1
+            END
+            CONTINUE
+        END
+
+        // 文字列リテラル "..."
+        WHEN ch == "\""
+            SET start = pos
+            SET pos = pos + 1
+            SET value = ""
+            LOOP pos < len AND CHARAT(source, pos) != "\""
+                SET c = CHARAT(source, pos)
+                WHEN c == "\\" AND pos + 1 < len
+                    SET nextCh = CHARAT(source, pos + 1)
+                    WHEN nextCh == "n"
+                        SET value = value + NEWLINE_CHAR()
+                    END
+                    WHEN nextCh == "t"
+                        SET value = value + "\t"
+                    END
+                    WHEN nextCh == "\""
+                        SET value = value + "\""
+                    END
+                    WHEN nextCh == "\\"
+                        SET value = value + "\\"
+                    END
+                    SET pos = pos + 2
+                    CONTINUE
+                END
+                SET value = value + c
+                SET pos = pos + 1
+            END
+            WHEN pos >= len
+                THROW "Unterminated string literal starting at " + STR(start)
+            END
+            SET pos = pos + 1
+            PUSH(tokens, Token(TokenType.STRING, value, start))
+            CONTINUE
+        END
+
+        // 数値（整数・小数）
+        WHEN ISDIGIT(ch)
+            SET start = pos
+            LOOP pos < len AND ISDIGIT(CHARAT(source, pos))
+                SET pos = pos + 1
+            END
+            WHEN pos < len AND CHARAT(source, pos) == "." AND pos + 1 < len AND ISDIGIT(CHARAT(source, pos + 1))
+                SET pos = pos + 1
+                LOOP pos < len AND ISDIGIT(CHARAT(source, pos))
+                    SET pos = pos + 1
+                END
+            END
+            SET value = SUBSTR(source, start, pos)
+            PUSH(tokens, Token(TokenType.NUMBER, value, start))
+            CONTINUE
+        END
+
+        // 識別子
+        WHEN isIdentifierStart(ch)
+            SET start = pos
+            LOOP pos < len AND isIdentifierPart(CHARAT(source, pos))
+                SET pos = pos + 1
+            END
+            SET value = SUBSTR(source, start, pos)
+            PUSH(tokens, Token(TokenType.IDENTIFIER, value, start))
+            CONTINUE
+        END
+
+        // 多文字記号（先に判定）
+        SET multi = tryMatchMultiChar(source, pos, len)
+        WHEN multi != NULL
+            PUSH(tokens, Token(TokenType.SYMBOL, multi, pos))
+            SET pos = pos + LENGTH(multi)
+            CONTINUE
+        END
+
+        // 1文字記号
+        PUSH(tokens, Token(TokenType.SYMBOL, ch, pos))
+        SET pos = pos + 1
+
+    END
+
+    PUSH(tokens, Token(TokenType.EOF, "", pos))
+
+    RETURN tokens
+
+END
+
+FUNC NEWLINE_CHAR()
+    RETURN CHR(10)
+END
+
+EXPORT tokenize
+
+// ===== 単体実行時のデモ =====
+
+SET demo = "SET x = 3.14; // コメント\nSET name = \"hello\\nworld\";\nOUT(x >= 1 && name != \"\");"
+SET toks = tokenize(demo)
+SET printTok = LAMBDA (t) => OUT(STR(t.type) + ":" + t.value + " ")
+FOREACH t IN toks
+    printTok(t)
+END
+
+EXIT
